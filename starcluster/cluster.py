@@ -152,6 +152,8 @@ class ClusterManager(managers.Manager):
                                    require_keys=False)
         node = cluster.get_node(node_id)
         key_location = self.cfg.get_key(node.key_name).get('key_location')
+        if node.key_location == "":
+            node.key_location = key_location
         cluster.key_location = key_location
         cluster.keyname = node.key_name
         cluster.validator.validate_keypair()
@@ -738,6 +740,7 @@ class Cluster(object):
             for node in self.nodes:
                 if node.is_master():
                     self._master = node
+                    break
             if not self._master:
                 raise exception.MasterDoesNotExist()
         self._master.key_location = self.key_location
@@ -2047,14 +2050,21 @@ class ClusterValidator(validators.Validator):
             except ValueError:
                 raise exception.InvalidPortRange(
                     from_port, to_port, reason="integer range required")
-            if from_port < 0 or to_port < 0:
-                raise exception.InvalidPortRange(
-                    from_port, to_port,
-                    reason="from/to must be positive integers")
-            if from_port > to_port:
-                raise exception.InvalidPortRange(
-                    from_port, to_port,
-                    reason="'from_port' must be <= 'to_port'")
+            if protocol == 'icmp':
+                if from_port != -1 or to_port != -1:
+                    raise exception.InvalidPortRange(
+                        from_port, to_port,
+                        reason="for icmp protocol from_port "
+                        "and to_port must be -1")
+            else:
+                if from_port < 0 or to_port < 0:
+                    raise exception.InvalidPortRange(
+                        from_port, to_port,
+                        reason="from/to must be positive integers")
+                if from_port > to_port:
+                    raise exception.InvalidPortRange(
+                        from_port, to_port,
+                        reason="'from_port' must be <= 'to_port'")
             cidr_ip = permission.get('cidr_ip')
             if not iptools.ipv4.validate_cidr(cidr_ip):
                 raise exception.InvalidCIDRSpecified(cidr_ip)
